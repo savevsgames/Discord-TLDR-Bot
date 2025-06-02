@@ -1,0 +1,17 @@
+modules = ["nodejs-20"]
+
+[workflows]
+runButton = "Start Discord Bot"
+
+[[workflows.workflow]]
+name = "Start Discord Bot"
+author = 40164252
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node src/index.js"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
