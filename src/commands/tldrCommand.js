@@ -1,45 +1,63 @@
-import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { getConfig, addMonitoredChannel, removeMonitoredChannel, setSummaryChannel } from '../utils/config.js';
-import { createSummary } from '../services/summarizer.js';
-import { logger } from '../utils/logger.js';
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
+import {
+  getConfig,
+  addMonitoredChannel,
+  removeMonitoredChannel,
+  setSummaryChannel,
+} from "../utils/config.js";
+import { createSummary } from "../services/summarizer.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Register the TLDR command
  */
 export function registerTldrCommand() {
   return new SlashCommandBuilder()
-    .setName('tldr')
-    .setDescription('TLDR Bot commands')
-    .addSubcommand(subcommand =>
+    .setName("tldr")
+    .setDescription("TLDR Bot commands")
+    .addSubcommand((subcommand) =>
       subcommand
-        .setName('now')
-        .setDescription('Generate a summary for the last hour')
+        .setName("now")
+        .setDescription("Generate a summary for the last hour")
     )
-    .addSubcommand(subcommand =>
+    .addSubcommand((subcommand) =>
       subcommand
-        .setName('help')
-        .setDescription('Show help information for TLDR Bot')
+        .setName("help")
+        .setDescription("Show help information for TLDR Bot")
     )
-    .addSubcommand(subcommand =>
+    .addSubcommand((subcommand) =>
       subcommand
-        .setName('config')
-        .setDescription('Configure TLDR Bot')
-        .addStringOption(option =>
+        .setName("hours")
+        .setDescription("Generate a summary for the last N hours")
+        .addIntegerOption((option) =>
           option
-            .setName('action')
-            .setDescription('Configuration action')
+            .setName("count")
+            .setDescription("Number of hours to summarize")
+            .setRequired(true)
+            .setMinValue(1)
+            .setMaxValue(24)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("config")
+        .setDescription("Configure TLDR Bot")
+        .addStringOption((option) =>
+          option
+            .setName("action")
+            .setDescription("Configuration action")
             .setRequired(true)
             .addChoices(
-              { name: 'list', value: 'list' },
-              { name: 'add', value: 'add' },
-              { name: 'remove', value: 'remove' },
-              { name: 'set', value: 'set' }
+              { name: "list", value: "list" },
+              { name: "add", value: "add" },
+              { name: "remove", value: "remove" },
+              { name: "set", value: "set" }
             )
         )
-        .addChannelOption(option =>
+        .addChannelOption((option) =>
           option
-            .setName('channel')
-            .setDescription('The channel to configure')
+            .setName("channel")
+            .setDescription("The channel to configure")
             .setRequired(false)
         )
     )
@@ -53,18 +71,21 @@ export function registerTldrCommand() {
  */
 export async function handleTldrSubcommand(interaction, subcommand) {
   switch (subcommand) {
-    case 'now':
+    case "now":
       await handleNowSubcommand(interaction);
       break;
-    case 'help':
+    case "help":
       await handleHelpSubcommand(interaction);
       break;
-    case 'config':
+    case "hours":
+      await handleHoursSubcommand(interaction);
+      break;
+    case "config":
       await handleConfigSubcommand(interaction);
       break;
     default:
       await interaction.reply({
-        content: 'Unknown subcommand.',
+        content: "Unknown subcommand.",
         ephemeral: true,
       });
   }
@@ -76,38 +97,41 @@ export async function handleTldrSubcommand(interaction, subcommand) {
  */
 async function handleNowSubcommand(interaction) {
   await interaction.deferReply({ ephemeral: true });
-  
+
   try {
     // Check if there's a summary channel configured
     const config = getConfig();
     if (!config.summaryChannelId) {
       return await interaction.editReply({
-        content: 'No summary channel configured. Use `/tldr config set` to set one.',
+        content:
+          "No summary channel configured. Use `/tldr config set` to set one.",
       });
     }
-    
+
     if (config.monitoredChannelIds.length === 0) {
       return await interaction.editReply({
-        content: 'No channels are being monitored. Use `/tldr config add` to add channels.',
+        content:
+          "No channels are being monitored. Use `/tldr config add` to add channels.",
       });
     }
-    
+
     // Create and post the summary
     const success = await createSummary(interaction.client);
-    
+
     if (success) {
       await interaction.editReply({
-        content: 'Summary generated and posted to the summary channel.',
+        content: "Summary generated and posted to the summary channel.",
       });
     } else {
       await interaction.editReply({
-        content: 'Failed to generate a summary. Please check the logs for more information.',
+        content:
+          "Failed to generate a summary. Please check the logs for more information.",
       });
     }
   } catch (error) {
-    logger.error('Error handling now subcommand:', error);
+    logger.error("Error handling now subcommand:", error);
     await interaction.editReply({
-      content: 'An error occurred while generating the summary.',
+      content: "An error occurred while generating the summary.",
     });
   }
 }
@@ -118,37 +142,38 @@ async function handleNowSubcommand(interaction) {
  */
 async function handleHelpSubcommand(interaction) {
   const helpEmbed = {
-    color: 0x5865F2,
-    title: 'TLDR Bot Help',
-    description: 'TLDR Bot summarizes conversations in your Discord server.',
+    color: 0x5865f2,
+    title: "TLDR Bot Help",
+    description: "TLDR Bot summarizes conversations in your Discord server.",
     fields: [
       {
-        name: '/tldr now',
-        value: 'Generate a summary for the last hour immediately.',
+        name: "/tldr now",
+        value: "Generate a summary for the last hour immediately.",
       },
       {
-        name: '/tldr config list',
-        value: 'Show current configuration including monitored channels and summary channel.',
+        name: "/tldr config list",
+        value:
+          "Show current configuration including monitored channels and summary channel.",
       },
       {
-        name: '/tldr config add [channel]',
-        value: 'Add a channel to be monitored for summaries.',
+        name: "/tldr config add [channel]",
+        value: "Add a channel to be monitored for summaries.",
       },
       {
-        name: '/tldr config remove [channel]',
-        value: 'Remove a channel from being monitored.',
+        name: "/tldr config remove [channel]",
+        value: "Remove a channel from being monitored.",
       },
       {
-        name: '/tldr config set [channel]',
-        value: 'Set the channel where summaries will be posted.',
+        name: "/tldr config set [channel]",
+        value: "Set the channel where summaries will be posted.",
       },
       {
-        name: '/tldr help',
-        value: 'Show this help message.',
+        name: "/tldr help",
+        value: "Show this help message.",
       },
     ],
     footer: {
-      text: 'TLDR Bot - Hourly summaries made easy',
+      text: "TLDR Bot - Hourly summaries made easy",
     },
   };
 
@@ -166,33 +191,77 @@ async function handleConfigSubcommand(interaction) {
   // Check if user has administrator permissions
   if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
     return await interaction.reply({
-      content: 'You need administrator permissions to configure TLDR Bot.',
+      content: "You need administrator permissions to configure TLDR Bot.",
       ephemeral: true,
     });
   }
 
-  const action = interaction.options.getString('action');
-  const channel = interaction.options.getChannel('channel');
+  const action = interaction.options.getString("action");
+  const channel = interaction.options.getChannel("channel");
   const config = getConfig();
 
   switch (action) {
-    case 'list':
+    case "list":
       await handleConfigList(interaction, config);
       break;
-    case 'add':
+    case "add":
       await handleConfigAdd(interaction, channel, config);
       break;
-    case 'remove':
+    case "remove":
       await handleConfigRemove(interaction, channel, config);
       break;
-    case 'set':
+    case "set":
       await handleConfigSet(interaction, channel, config);
       break;
     default:
       await interaction.reply({
-        content: 'Unknown configuration action.',
+        content: "Unknown configuration action.",
         ephemeral: true,
       });
+  }
+}
+
+/**
+ * Handle the "hours" subcommand to generate a summary for the last N hours
+ * @param {Interaction} interaction - Discord.js interaction
+ */
+async function handleHoursSubcommand(interaction) {
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    const count = interaction.options.getInteger("count");
+    const config = getConfig();
+    if (!config.summaryChannelId) {
+      return await interaction.editReply({
+        content:
+          "No summary channel configured. Use `/tldr config set` to set one.",
+      });
+    }
+    if (config.monitoredChannelIds.length === 0) {
+      return await interaction.editReply({
+        content:
+          "No channels are being monitored. Use `/tldr config add` to add channels.",
+      });
+    }
+
+    // Pass the count to your summarizer (you may need to update createSummary to accept this)
+    const success = await createSummary(interaction.client, count);
+
+    if (success) {
+      await interaction.editReply({
+        content: `Summary for the last ${count} hours generated and posted to the summary channel.`,
+      });
+    } else {
+      await interaction.editReply({
+        content:
+          "Failed to generate a summary. Please check the logs for more information.",
+      });
+    }
+  } catch (error) {
+    logger.error("Error handling hours subcommand:", error);
+    await interaction.editReply({
+      content: "An error occurred while generating the summary.",
+    });
   }
 }
 
@@ -203,25 +272,26 @@ async function handleConfigSubcommand(interaction) {
  */
 async function handleConfigList(interaction, config) {
   const { summaryChannelId, monitoredChannelIds } = config;
-  
-  const summaryChannel = summaryChannelId 
-    ? `<#${summaryChannelId}>` 
-    : 'Not configured';
-  
-  const monitoredChannels = monitoredChannelIds.length > 0
-    ? monitoredChannelIds.map(id => `<#${id}>`).join('\n')
-    : 'No channels are being monitored';
-  
+
+  const summaryChannel = summaryChannelId
+    ? `<#${summaryChannelId}>`
+    : "Not configured";
+
+  const monitoredChannels =
+    monitoredChannelIds.length > 0
+      ? monitoredChannelIds.map((id) => `<#${id}>`).join("\n")
+      : "No channels are being monitored";
+
   const configEmbed = {
-    color: 0x5865F2,
-    title: 'TLDR Bot Configuration',
+    color: 0x5865f2,
+    title: "TLDR Bot Configuration",
     fields: [
       {
-        name: 'Summary Channel',
+        name: "Summary Channel",
         value: summaryChannel,
       },
       {
-        name: 'Monitored Channels',
+        name: "Monitored Channels",
         value: monitoredChannels,
       },
     ],
@@ -242,19 +312,19 @@ async function handleConfigList(interaction, config) {
 async function handleConfigAdd(interaction, channel, config) {
   if (!channel) {
     return await interaction.reply({
-      content: 'You need to specify a channel to add.',
+      content: "You need to specify a channel to add.",
       ephemeral: true,
     });
   }
-  
+
   // Only allow text channels
   if (!channel.isTextBased()) {
     return await interaction.reply({
-      content: 'Only text channels can be monitored.',
+      content: "Only text channels can be monitored.",
       ephemeral: true,
     });
   }
-  
+
   // Check if channel is already being monitored
   if (config.monitoredChannelIds.includes(channel.id)) {
     return await interaction.reply({
@@ -262,10 +332,10 @@ async function handleConfigAdd(interaction, channel, config) {
       ephemeral: true,
     });
   }
-  
+
   // Add channel to monitored channels
   const success = await addMonitoredChannel(channel.id);
-  
+
   if (success) {
     await interaction.reply({
       content: `${channel} has been added to monitored channels.`,
@@ -288,11 +358,11 @@ async function handleConfigAdd(interaction, channel, config) {
 async function handleConfigRemove(interaction, channel, config) {
   if (!channel) {
     return await interaction.reply({
-      content: 'You need to specify a channel to remove.',
+      content: "You need to specify a channel to remove.",
       ephemeral: true,
     });
   }
-  
+
   // Check if channel is being monitored
   if (!config.monitoredChannelIds.includes(channel.id)) {
     return await interaction.reply({
@@ -300,10 +370,10 @@ async function handleConfigRemove(interaction, channel, config) {
       ephemeral: true,
     });
   }
-  
+
   // Remove channel from monitored channels
   const success = await removeMonitoredChannel(channel.id);
-  
+
   if (success) {
     await interaction.reply({
       content: `${channel} has been removed from monitored channels.`,
@@ -326,22 +396,22 @@ async function handleConfigRemove(interaction, channel, config) {
 async function handleConfigSet(interaction, channel, config) {
   if (!channel) {
     return await interaction.reply({
-      content: 'You need to specify a channel to set as the summary channel.',
+      content: "You need to specify a channel to set as the summary channel.",
       ephemeral: true,
     });
   }
-  
+
   // Only allow text channels
   if (!channel.isTextBased()) {
     return await interaction.reply({
-      content: 'Only text channels can be set as the summary channel.',
+      content: "Only text channels can be set as the summary channel.",
       ephemeral: true,
     });
   }
-  
+
   // Set summary channel
   const success = await setSummaryChannel(channel.id);
-  
+
   if (success) {
     await interaction.reply({
       content: `${channel} has been set as the summary channel.`,
